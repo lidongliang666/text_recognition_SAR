@@ -6,6 +6,7 @@ import cv2
 import torch.utils.data as data
 import os
 import torch
+import torchvision
 import numpy as np
 import xml.etree.ElementTree as ET
 from scipy.io import loadmat
@@ -261,7 +262,8 @@ class iiit5k_dataset_builder(data.Dataset):
         return len(self.dataset)
 
 class iiit5k_dataset_builder2(data.Dataset):
-    def __init__(self, height, width, seq_len, total_img_path, annotation_path,min_w=48,max_w=160):
+    def __init__(self, height, width, seq_len, total_img_path, 
+        annotation_path,min_w=48,max_w=160,train=True):
         '''
         height: input height to model
         width: input width to model
@@ -281,6 +283,11 @@ class iiit5k_dataset_builder2(data.Dataset):
         self.voc, self.char2id, _ = dictionary_generator()
         self.output_classes = len(self.voc)
 
+        if train:
+            self.trans = torchvision.transforms.ColorJitter(
+                    brightness=0.0,contrast=0.0,hue=0.2)
+        else:
+            self.trans = None
         for items in self.dictionary:
             if items[0].split('/')[-1] in self.total_img_name:
                 self.dataset.append([items[0].split('/')[-1],items[1]])
@@ -309,12 +316,17 @@ class iiit5k_dataset_builder2(data.Dataset):
         background = (background - 127.5)/127.5 # normalization to [-1,1]
         background = torch.FloatTensor(background) # convert to tensor [H, W, C]
         background = background.permute(2,0,1) # [C, H, W]
+        if not self.trans is None:
+            background = self.trans(background)
         y_true = np.ones(self.seq_len)*self.char2id['PAD'] # initialize y_true with 'PAD', size [seq_len]
         # label processing
         for i, c in enumerate(label):
             index = self.char2id[c]
             y_true[i] = index
-        y_true[-1] = self.char2id['END'] # always put 'END' in the end
+        if len(label) < self.seq_len:
+            y_true[len(label)] = self.char2id['END']
+        else:
+            y_true[-1] = self.char2id['END'] # always put 'END' in the end
         y_true = y_true.astype(int) # must to integer index for one-hot encoding
         # convert to one-hot encoding
         y_onehot = np.eye(self.output_classes)[y_true] # [seq_len, output_classes]

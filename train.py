@@ -100,8 +100,8 @@ if __name__ == '__main__':
         test_img_path = os.path.join(dataset_path, 'test')
         train_annotation_path = os.path.join(dataset_path, 'traindata.mat')
         test_annotation_path = os.path.join(dataset_path, 'testdata.mat')
-        train_dataset = dataset.iiit5k_dataset_builder2(Height, Width, seq_len, train_img_path, train_annotation_path)
-        test_dataset = dataset.iiit5k_dataset_builder2(Height, Width, seq_len, test_img_path, test_annotation_path)
+        train_dataset = dataset.iiit5k_dataset_builder2(Height, Width, seq_len, train_img_path, train_annotation_path,train=True)
+        test_dataset = dataset.iiit5k_dataset_builder2(Height, Width, seq_len, test_img_path, test_annotation_path,train=False)
     elif dataset_type == 'syn90k': # Syn90K dataset
         train_img_path = os.path.join(dataset_path, 'train')
         test_img_path = os.path.join(dataset_path, 'test')

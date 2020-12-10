@@ -260,6 +260,70 @@ class iiit5k_dataset_builder(data.Dataset):
     def __len__(self):
         return len(self.dataset)
 
+class iiit5k_dataset_builder2(data.Dataset):
+    def __init__(self, height, width, seq_len, total_img_path, annotation_path,min_w=48,max_w=160):
+        '''
+        height: input height to model
+        width: input width to model
+        total_img_path: path with all images
+        annotation_path: mat labeling file
+        seq_len: sequence length
+        '''
+        self.total_img_path = total_img_path
+        self.height = height
+        self.width = width
+        self.min_w = min_w
+        self.max_w = max_w
+        self.seq_len = seq_len
+        self.dictionary = iiit5k_mat_extractor(annotation_path)
+        self.total_img_name = os.listdir(total_img_path)
+        self.dataset = []
+        self.voc, self.char2id, _ = dictionary_generator()
+        self.output_classes = len(self.voc)
+
+        for items in self.dictionary:
+            if items[0].split('/')[-1] in self.total_img_name:
+                self.dataset.append([items[0].split('/')[-1],items[1]])
+
+    def __getitem__(self, index):
+        img_name, label = self.dataset[index]
+        background = np.random.randint(0,255,(self.height,self.width,3))
+        IMG = cv2.imread(os.path.join(self.total_img_path,img_name))
+        o_h,o_w,_ = IMG.shape
+        r_w = int(o_w * self.height / o_h)
+        IMG = cv2.resize(IMG,(r_w,self.height))
+
+        if r_w<self.min_w:
+            IMG = cv2.resize(IMG,(self.min_w,self.height))
+            background[:,:self.min_w] = IMG
+        elif r_w>self.max_w:
+            IMG = cv2.resize(IMG,(self.max_w,self.height))
+            background[:,:self.max_w] = IMG
+        else :
+            background[:,:r_w] = IMG
+        # #保存 可视化
+        # cv2.imwrite('random.jpg',background)
+        # raise ''
+
+        # IMG = cv2.resize(IMG, (self.width, self.height)) # resize
+        background = (background - 127.5)/127.5 # normalization to [-1,1]
+        background = torch.FloatTensor(background) # convert to tensor [H, W, C]
+        background = background.permute(2,0,1) # [C, H, W]
+        y_true = np.ones(self.seq_len)*self.char2id['PAD'] # initialize y_true with 'PAD', size [seq_len]
+        # label processing
+        for i, c in enumerate(label):
+            index = self.char2id[c]
+            y_true[i] = index
+        y_true[-1] = self.char2id['END'] # always put 'END' in the end
+        y_true = y_true.astype(int) # must to integer index for one-hot encoding
+        # convert to one-hot encoding
+        y_onehot = np.eye(self.output_classes)[y_true] # [seq_len, output_classes]
+
+        return background, torch.FloatTensor(y_onehot)
+
+    def __len__(self):
+        return len(self.dataset)
+
 class syn90k_dataset_builder(data.Dataset):
     def __init__(self, height, width, seq_len, total_img_path):
         '''
@@ -302,6 +366,29 @@ class syn90k_dataset_builder(data.Dataset):
 
     def __len__(self):
         return len(self.dataset)
+
+class talenglish_dataset_builder(data.Dataset):
+    def __init__(self, height, width, seq_len, total_img_path):
+        '''
+        height: input height to model
+        width: input width to model
+        total_img_path: path with all images
+        seq_len: sequence length
+        '''
+        self.total_img_path = total_img_path
+        self.height = height
+        self.width = width
+        self.seq_len = seq_len
+        self.total_img_name = os.listdir(total_img_path)
+        self.dataset = []
+        self.voc, self.char2id, _ = dictionary_generator()
+        self.output_classes = len(self.voc)
+
+        for img_name in self.total_img_name:
+            _, label, _ = img_name.split('_')
+            self.dataset.append([img_name, label])
+
+
 
 class synthtext_dataset_builder(data.Dataset):
     def __init__(self, height, width, seq_len, total_img_path, annotation_path):
@@ -388,73 +475,81 @@ class test_dataset_builder(data.Dataset):
 # unit test
 if __name__ == '__main__':
 
-    img_path = '../svt/img/'
-    train_xml_path = '../svt/train.xml'
-    test_xml_path = '../svt/test.xml'
+    # img_path = '../svt/img/'
+    # train_xml_path = '../svt/train.xml'
+    # test_xml_path = '../svt/test.xml'
 
     img_path_iiit = '../IIIT5K/train/'
     annotation_path_iiit = '../IIIT5K/traindata.mat'
 
-    img_path_syn90k = '../Syn90k/train/'
+    # img_path_syn90k = '../Syn90k/train/'
 
-    img_path_synthtext = '../SynthText/train/'
-    annotation_path_synthtext = '../SynthText/gt.mat'
+    # img_path_synthtext = '../SynthText/train/'
+    # annotation_path_synthtext = '../SynthText/gt.mat'
 
     height = 48 # input height pixel
-    width = 64 # input width pixel
+    width = 160 # input width pixel
     seq_len = 40 # sequence length
 
     voc, char2id, id2char = dictionary_generator()
 
-    train_dict = svt_xml_extractor(train_xml_path)
-    print("Dictionary for training set is:", train_dict)
+    # train_dict = svt_xml_extractor(train_xml_path)
+    # print("Dictionary for training set is:", train_dict)
 
-    train_dataset = svt_dataset_builder(height, width, seq_len, img_path, train_xml_path)
+    # train_dataset = svt_dataset_builder(height, width, seq_len, img_path, train_xml_path)
 
-    for i, item in enumerate(train_dataset):
-        print(item[0].shape,item[1].shape)
+    # for i, item in enumerate(train_dataset):
+        # print(item[0].shape,item[1].shape)
 
-    test_dataset = svt_dataset_builder(height, width, seq_len, img_path, test_xml_path)
+    # test_dataset = svt_dataset_builder(height, width, seq_len, img_path, test_xml_path)
 
-    train_dict_iiit = iiit5k_mat_extractor(annotation_path_iiit)
-    print("Dictionary for training set is:", train_dict_iiit)
+    # train_dict_iiit = iiit5k_mat_extractor(annotation_path_iiit)
+    # print("Dictionary for training set is:", train_dict_iiit)
 
-    train_dataset_iiit5k = iiit5k_dataset_builder(height, width, seq_len, img_path_iiit, annotation_path_iiit)
+    # train_dataset_iiit5k = iiit5k_dataset_builder(height, width, seq_len, img_path_iiit, annotation_path_iiit)
+    train_dataset_iiit5k2 = iiit5k_dataset_builder2(height, width, seq_len, img_path_iiit, annotation_path_iiit)
 
-    train_dataset_syn90k = syn90k_dataset_builder(height, width, seq_len, img_path_syn90k)
+    # train_dataset_syn90k = syn90k_dataset_builder(height, width, seq_len, img_path_syn90k)
 
-    train_dict_synthtext = synthtext_mat_extractor(annotation_path_synthtext)
+    # train_dict_synthtext = synthtext_mat_extractor(annotation_path_synthtext)
     #print("Dictionary for training set is:", train_dict_synthtext)
 
-    train_dataset_synthtext = synthtext_dataset_builder(height, width, seq_len, img_path_synthtext, annotation_path_synthtext)
+    # train_dataset_synthtext = synthtext_dataset_builder(height, width, seq_len, img_path_synthtext, annotation_path_synthtext)
 
-    for i, item in enumerate(train_dataset):
-        print(item[0].shape,item[1].shape)
-        IMG = item[0].permute(1,2,0)
-        IMG = IMG.detach().numpy()
-        IMG = (IMG*127.5+127.5).astype(np.uint8)
-        cv2.imwrite('../test/svt_'+str(i)+'.jpg', IMG)
+    # for i, item in enumerate(train_dataset):
+    #     print(item[0].shape,item[1].shape)
+    #     IMG = item[0].permute(1,2,0)
+    #     IMG = IMG.detach().numpy()
+    #     IMG = (IMG*127.5+127.5).astype(np.uint8)
+    #     cv2.imwrite('../test/svt_'+str(i)+'.jpg', IMG)
 
-    for i, item in enumerate(train_dataset_iiit5k):
+    # for i, item in enumerate(train_dataset_iiit5k):
+    #     print(item[0].shape,item[1].shape)
+    #     IMG = item[0].permute(1,2,0)
+    #     IMG = IMG.detach().numpy()
+    #     IMG = (IMG*127.5+127.5).astype(np.uint8)
+    #     cv2.imwrite('../test/iiit_'+str(i)+'.jpg', IMG)
+
+    for i, item in enumerate(train_dataset_iiit5k2):
         print(item[0].shape,item[1].shape)
         IMG = item[0].permute(1,2,0)
         IMG = IMG.detach().numpy()
         IMG = (IMG*127.5+127.5).astype(np.uint8)
         cv2.imwrite('../test/iiit_'+str(i)+'.jpg', IMG)
 
-    for i, item in enumerate(train_dataset_syn90k):
-        print(item[0].shape,item[1].shape)
-        IMG = item[0].permute(1,2,0)
-        IMG = IMG.detach().numpy()
-        IMG = (IMG*127.5+127.5).astype(np.uint8)
-        cv2.imwrite('../test/syn90k_'+str(i)+'.jpg', IMG)
+    # for i, item in enumerate(train_dataset_syn90k):
+    #     print(item[0].shape,item[1].shape)
+    #     IMG = item[0].permute(1,2,0)
+    #     IMG = IMG.detach().numpy()
+    #     IMG = (IMG*127.5+127.5).astype(np.uint8)
+    #     cv2.imwrite('../test/syn90k_'+str(i)+'.jpg', IMG)
 
-    for i, item in enumerate(train_dataset_synthtext):
-        print(item[0].shape,item[1].shape)
-        IMG = item[0].permute(1,2,0)
-        IMG = IMG.detach().numpy()
-        IMG = (IMG*127.5+127.5).astype(np.uint8)
-        target = item[1].max(1)[1] # [seq_len]
-        label = end_cut(target.detach().cpu().numpy(), char2id, id2char)
-        print(label)
-        cv2.imwrite('../test/synthtext_'+str(i)+'.jpg', IMG)
+    # for i, item in enumerate(train_dataset_synthtext):
+    #     print(item[0].shape,item[1].shape)
+    #     IMG = item[0].permute(1,2,0)
+    #     IMG = IMG.detach().numpy()
+    #     IMG = (IMG*127.5+127.5).astype(np.uint8)
+    #     target = item[1].max(1)[1] # [seq_len]
+    #     label = end_cut(target.detach().cpu().numpy(), char2id, id2char)
+    #     print(label)
+    #     cv2.imwrite('../test/synthtext_'+str(i)+'.jpg', IMG)

@@ -2,6 +2,7 @@
 THis is the main training code.
 '''
 import os
+import time
 os.environ["CUDA_VISIBLE_DEVICES"] = "0" # set GPU id at the very begining
 import argparse
 import random
@@ -59,7 +60,8 @@ if __name__ == '__main__':
     # set training parameters
     batch_size = opt.batch
     Height = 48
-    Width = 64
+    # Width = 64
+    Width = 160
     feature_height = Height // 4
     feature_width = Width // 8
     Channel = 3
@@ -93,6 +95,13 @@ if __name__ == '__main__':
         test_annotation_path = os.path.join(dataset_path, 'testdata.mat')
         train_dataset = dataset.iiit5k_dataset_builder(Height, Width, seq_len, train_img_path, train_annotation_path)
         test_dataset = dataset.iiit5k_dataset_builder(Height, Width, seq_len, test_img_path, test_annotation_path)
+    elif dataset_type == 'iiit5k2': # IIIT5k dataset
+        train_img_path = os.path.join(dataset_path, 'train')
+        test_img_path = os.path.join(dataset_path, 'test')
+        train_annotation_path = os.path.join(dataset_path, 'traindata.mat')
+        test_annotation_path = os.path.join(dataset_path, 'testdata.mat')
+        train_dataset = dataset.iiit5k_dataset_builder2(Height, Width, seq_len, train_img_path, train_annotation_path)
+        test_dataset = dataset.iiit5k_dataset_builder2(Height, Width, seq_len, test_img_path, test_annotation_path)
     elif dataset_type == 'syn90k': # Syn90K dataset
         train_img_path = os.path.join(dataset_path, 'train')
         test_img_path = os.path.join(dataset_path, 'test')
@@ -148,7 +157,7 @@ if __name__ == '__main__':
             model = model.to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    lmbda = lambda epoch: 0.9**(epoch // 300) if epoch < 13200 else 10**(-2)
+    lmbda = lambda epoch: 0.9**(epoch // 10) if epoch < 90 else 10**(-2)
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lmbda)
 
     num_batch = math.ceil(len(train_dataset) / batch_size)
@@ -198,23 +207,29 @@ if __name__ == '__main__':
         print("Testing......")
         with torch.set_grad_enabled(False):
             M_list = []
+            time_list = []
             for i, data in enumerate(test_dataloader):
                 x = data[0] # [batch_size, Channel, Height, Width]
                 y = data[1] # [batch_size, seq_len, output_classes]
                 x, y = x.to(device), y.to(device)
                 model = model.eval()
+                start_time = time.time()
                 predict, _, _, _ = model(x, y)
                 # prediction evaluation
                 pred_choice = predict.max(2)[1] # [batch_size, seq_len]
                 target = y.max(2)[1] # [batch_size, seq_len]
                 metric, metric_list, predict_words, labeled_words = performance_evaluate(pred_choice.detach().cpu().numpy(), target.detach().cpu().numpy(), voc, char2id, id2char, eval_metric)
+                time_end = time.time()
                 M_list += metric_list
+                time_list.append(time_end-start_time)
             test_acc = float(sum(M_list)/len(M_list))
+            time_const = float(sum(time_list)/len(time_list))
             #print("Test predict words:", predict_words[0])
             #print("Test labeled words:", labeled_words[0])
             print("Epoch {} average test accuracy: {}".format(epoch, test_acc))
+            print("Epoch {} average time const: {}".format(epoch, time_const))
             with open(os.path.join(output_path,'statistics.txt'), 'a') as f:
-                f.write("{} {}\n".format(train_acc, test_acc))
+                f.write("{} {} {}\n".format(epoch,train_acc, test_acc))
             if eval_metric == 'accuracy':
                 if test_acc >= best_acc:
                     print("Save current best model with accuracy:", test_acc)

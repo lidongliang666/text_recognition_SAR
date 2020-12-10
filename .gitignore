@@ -2,3 +2,10 @@ __pycache__
 .DS_Store
 logs
 .ipynb_checkpoints
+svt/
+str/
+IIIT5K/
+TAL_OCR_ENG手写英文数据集/
+TAL_OCR_MATH小学算数公式数据集/
+test/
+文本识别实践过程.md

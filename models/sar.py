@@ -4,6 +4,8 @@ This code is to construct the complete SAR model by combining backbone+encoder+d
 import torch
 import torch.nn as nn
 from .backbone import backbone
+# from .shufflenetv2 import shufflenet_v2_x1_0
+from .mobilenetv2 import MobileNetV2
 from .encoder import encoder
 from .decoder import decoder
 
@@ -22,7 +24,9 @@ class sar(nn.Module):
         keep_prob: keep_prob probability dropout for LSTM encoder
         seq_len: decoding sequence length
         '''
-        self.backbone = backbone(channel)
+        # self.backbone = backbone(channel)
+        # self.backbone = shufflenet_v2_x1_0()
+        self.backbone = MobileNetV2()
         self.encoder_model = encoder(feature_height, 512, hidden_units, layers, keep_prob, device)
         self.decoder_model = decoder(output_classes, feature_height, feature_width, 512, hidden_units, seq_len, device)
         self.embedding_dim = embedding_dim

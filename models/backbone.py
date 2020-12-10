@@ -4,6 +4,9 @@ This code is to construct backbone network for SAR - with 13 layers of customize
 import torch
 import torch.nn as nn
 
+# from .shufflenetv2 import shufflenet_v2_x1_0
+from .mobilenetv2 import MobileNetV2
+
 __all__ = ['basicblock','backbone']
     
 class basicblock(nn.Module):
@@ -132,5 +135,15 @@ if __name__ == '__main__':
     model = backbone(Channel)
     output_features = model(input_images)
 
+    print("Input size is:",input_images.shape)
+    print("Output feature map size is:",output_features.shape)
+
+    # model = shufflenet_v2_x1_0()
+    # output_features = model(input_images)
+    # print("Input size is:",input_images.shape)
+    # print("Output feature map size is:",output_features.shape)
+
+    model = MobileNetV2()
+    output_features = model(input_images)
     print("Input size is:",input_images.shape)
     print("Output feature map size is:",output_features.shape)
